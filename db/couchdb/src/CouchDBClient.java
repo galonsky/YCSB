@@ -1,8 +1,10 @@
+import java.io.IOException;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
 import java.util.Vector;
-import org.jcouchdb.db.Database;
+import com.fourspaces.couchdb.Database;
+import com.fourspaces.couchdb.Document;
+import com.fourspaces.couchdb.Session;
 import com.yahoo.ycsb.DB;
 import com.yahoo.ycsb.DBException;
 
@@ -10,10 +12,11 @@ import com.yahoo.ycsb.DBException;
 public class CouchDBClient extends DB {
     
     private final static String HOST = "ubuntu";
+    private Session mySession;
     
     @Override
     public void init() throws DBException {
-        
+        mySession = new Session(HOST, 5984);
     }
 
     @Override
@@ -21,9 +24,17 @@ public class CouchDBClient extends DB {
                      String key,
                      Set<String> fields,
                      HashMap<String, String> result) {
-        Database db = new Database(HOST, table);
-        
-        return 0;
+        try {
+            Database db = mySession.getDatabase(table);
+            Document doc = db.getDocument(key);
+            for(String k : (Set<String>) doc.keySet()) {
+                result.put(k, doc.getString(k)); 
+            }
+            return 0;
+        }
+        catch (IOException e) {
+            return -1;
+        }
     }
 
     @Override
@@ -38,30 +49,61 @@ public class CouchDBClient extends DB {
 
     @Override
     public int update (String table, String key, HashMap<String, String> values) {
-        Database db = new Database(HOST, table);
-        values.put("_id", key);
-        db.updateDocument(values);
-        return 0;
+        try {
+            Database db = mySession.getDatabase(table);
+            Document doc = db.getDocument(key);
+            for(String k : values.keySet()) {
+                doc.put(k, values.get(k));
+            }
+            db.saveDocument(doc);
+            return 0;
+        }
+        catch (IOException e) {
+            return -1;
+        }
     }
 
     @Override
     public int insert (String table, String key, HashMap<String, String> values) {
-        Database db = new Database(HOST, table);
-        values.put("_id", key);
-        db.createDocument(values);
-        return 0;
+        try {
+            Database db = mySession.getDatabase(table);
+            Document doc = new Document();
+            for(String k : values.keySet()) {
+                doc.put(k, values.get(k));
+            }
+            doc.put("_id", key);
+            db.saveDocument(doc);
+            return 0;
+        }
+        catch (IOException e) {
+            return -1;
+        }
     }
 
     @Override
     public int delete (String table, String key) {
-        return 0;
+        try {
+            Database db = mySession.getDatabase(table);
+            Document doc = db.getDocument(key);
+            db.deleteDocument(doc);
+            return 0;
+        }
+        catch (IOException e) {
+            return -1;
+        }
     }
     
-    public static void main(String[] args) {
+    public static void main(String[] args) throws DBException {
         CouchDBClient couch = new CouchDBClient();
-        HashMap<String, String> doc = new HashMap<String, String>();
-        doc.put("poop", "pee");
-        couch.insert("test", "key", doc);
+        couch.init();
+        HashMap<String, String> map = new HashMap<String, String>();
+        map.put("name", "joe");
+        map.put("age", "21");
+        //couch.insert("test", "galonsky", map);
+        //couch.update("test", "galonsky", map);
+        couch.delete("test", "galonsky");
+        
+        
     }
 
 }
