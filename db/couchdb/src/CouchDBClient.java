@@ -1,5 +1,6 @@
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -9,7 +10,6 @@ import com.fourspaces.couchdb.Database;
 import com.fourspaces.couchdb.Document;
 import com.fourspaces.couchdb.Session;
 import com.fourspaces.couchdb.View;
-import com.fourspaces.couchdb.ViewResults;
 import com.yahoo.ycsb.DB;
 import com.yahoo.ycsb.DBException;
 
@@ -32,7 +32,7 @@ public class CouchDBClient extends DB {
         try {
             Database db = mySession.getDatabase(table);
             Document doc = db.getDocument(key);
-            docToMap(doc, result);
+            docToMap(doc, result, fields);
             return 0;
         }
         catch (IOException e) {
@@ -61,7 +61,7 @@ public class CouchDBClient extends DB {
         for (Document doc : results) {
             JSONObject json = doc.getJSONObject("doc");
             HashMap<String, String> map = new HashMap<String, String>();
-            docToMap(json, map);
+            docToMap(json, map, fields);
             result.add(map);
         }
         return 0;
@@ -113,28 +113,45 @@ public class CouchDBClient extends DB {
         }
     }
     
-    private void docToMap(Map doc, HashMap<String, String> map) {
-        for(String k : (Set<String>) doc.keySet()) {
-            map.put(k, (String) doc.get(k)); 
+    private void docToMap(Map doc, HashMap<String, String> map, Set<String> fields) {
+        if(fields == null)
+            fields = (Set<String>) doc.keySet();
+        for(String k : fields) {
+            if(!k.equals("_id") && !k.equals("_rev"))
+                map.put(k, (String) doc.get(k)); 
         }
     }
     
     public static void main(String[] args) throws DBException {
         CouchDBClient couch = new CouchDBClient();
         couch.init();
-        Vector<HashMap<String,String>> results = new Vector<HashMap<String,String>>();
-        couch.scan("test", "key", 5, null, results);
-        System.out.println(results.get(0).get("poop"));
+//        Vector<HashMap<String,String>> results = new Vector<HashMap<String,String>>();
+//        couch.scan("test", "key", 5, null, results);
+//        System.out.println(results.get(0).get("poop"));
         
-        //HashMap<String, String> map = new HashMap<String, String>();
-        //couch.read("test", "key", null, map);
-        //System.out.println(map.get("poop"));
-        //map.put("name", "joe");
-        //map.put("age", "21");
-        //couch.insert("test", "galonsky", map);
-        //couch.update("test", "galonsky", map);
-        //couch.delete("test", "galonsky");
-        //couch.scan("test", "key", 5, null, null);
+        HashMap<String, String> map = new HashMap<String, String>();
+//        couch.read("test", "key", null, map);
+//        System.out.println(map.get("poop"));
+//        map.put("name", "joe");
+//        map.put("age", "21");
+//        couch.insert("test", "galonsky", map);
+//        couch.update("test", "galonsky", map);
+//        couch.delete("test", "galonsky");
+//        couch.scan("test", "key", 5, null, null);
+        
+//        map.put("name", "alex");
+//        map.put("occupation", "badass");
+//        map.put("color", "blue");
+//        
+//        couch.insert("test", "galonsky", map);
+        
+        Set<String> fields = new HashSet<String>();
+        fields.add("name");
+        fields.add("occupation");
+        couch.read("test", "galonsky", fields, map);
+        
+        System.out.println(map);
+        
         
         
     }
