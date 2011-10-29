@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.Vector;
 import net.sf.json.JSONObject;
@@ -18,12 +19,12 @@ import com.yahoo.ycsb.DBException;
 
 public class CouchDBClient extends DB {
     
-    private final static String HOST = "ubuntu";
     private Session mySession;
     
     @Override
     public void init() throws DBException {
-        mySession = new Session(HOST, 5984);
+        Properties prop = getProperties();
+        mySession = new Session(prop.getProperty("couchdb.host"), 5984);
     }
 
     @Override
