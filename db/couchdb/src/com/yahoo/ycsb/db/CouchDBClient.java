@@ -34,6 +34,8 @@ public class CouchDBClient extends DB {
         try {
             Database db = mySession.getDatabase(table);
             Document doc = db.getDocument(key);
+            if(doc == null)
+                return -1;
             docToMap(doc, result, fields);
             return 0;
         }
@@ -74,6 +76,8 @@ public class CouchDBClient extends DB {
         try {
             Database db = mySession.getDatabase(table);
             Document doc = db.getDocument(key);
+            if(doc == null)
+                return -1;
             for(String k : values.keySet()) {
                 doc.put(k, values.get(k));
             }
@@ -107,6 +111,8 @@ public class CouchDBClient extends DB {
         try {
             Database db = mySession.getDatabase(table);
             Document doc = db.getDocument(key);
+            if(doc == null)
+                return -1;
             db.deleteDocument(doc);
             return 0;
         }
