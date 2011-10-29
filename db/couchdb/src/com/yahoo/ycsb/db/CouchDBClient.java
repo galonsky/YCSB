@@ -1,3 +1,5 @@
+package com.yahoo.ycsb.db;
+
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
