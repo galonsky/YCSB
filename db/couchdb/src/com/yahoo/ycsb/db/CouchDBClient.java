@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.Vector;
+import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import com.fourspaces.couchdb.Database;
 import com.fourspaces.couchdb.Document;
@@ -127,7 +128,12 @@ public class CouchDBClient extends DB {
             fields = (Set<String>) doc.keySet();
         for(String k : fields) {
             if(!k.equals("_id") && !k.equals("_rev"))
-                map.put(k, (String) doc.get(k)); 
+                try {
+                    map.put(k, (String) doc.get(k)); 
+                }
+                catch (ClassCastException e) {
+                    map.put(k, doc.get(k).toString());
+                }
         }
     }
     
