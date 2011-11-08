@@ -136,39 +136,5 @@ public class CouchDBClient extends DB {
                 }
         }
     }
-    
-    public static void main(String[] args) throws DBException {
-        CouchDBClient couch = new CouchDBClient();
-        couch.init();
-//        Vector<HashMap<String,String>> results = new Vector<HashMap<String,String>>();
-//        couch.scan("test", "key", 5, null, results);
-//        System.out.println(results.get(0).get("poop"));
-        
-        HashMap<String, String> map = new HashMap<String, String>();
-//        couch.read("test", "key", null, map);
-//        System.out.println(map.get("poop"));
-//        map.put("name", "joe");
-//        map.put("age", "21");
-//        couch.insert("test", "galonsky", map);
-//        couch.update("test", "galonsky", map);
-//        couch.delete("test", "galonsky");
-//        couch.scan("test", "key", 5, null, null);
-        
-//        map.put("name", "alex");
-//        map.put("occupation", "badass");
-//        map.put("color", "blue");
-//        
-//        couch.insert("test", "galonsky", map);
-        
-        Set<String> fields = new HashSet<String>();
-        fields.add("name");
-        fields.add("occupation");
-        couch.read("test", "galonsky", fields, map);
-        
-        System.out.println(map);
-        
-        
-        
-    }
 
 }
