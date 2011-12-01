@@ -4,8 +4,30 @@ import java.util.HashMap;
 import java.util.Set;
 import java.util.Vector;
 import com.yahoo.ycsb.DB;
+import com.yahoo.ycsb.DBException;
 
 public class CassandraHBaseClient extends DB {
+    
+    private DB myCassandra;
+    private DB myHBase;
+    private DB myCurrent;
+    
+    @Override
+    public void init() throws DBException {
+        myCassandra = new CassandraClient8();
+        myCassandra.init();
+        myHBase = new HBaseClient();
+        myHBase.init();
+        
+        //set default primary
+        myCurrent = myHBase;
+    }
+    
+    @Override
+    public void cleanup() throws DBException {
+        myCassandra.cleanup();
+        myHBase.cleanup();
+    }
 
     @Override
     public int read (String table,
