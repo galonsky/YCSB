@@ -9,13 +9,17 @@ import com.yahoo.ycsb.DBException;
 
 public class CassandraHBaseClient extends DB {
     
+    private static final int INTERVAL = 100;
+    
     private DB myCassandra;
     private DB myHBase;
     private DB myCurrent;
     
     private Map<String, Integer> myOperations;
+    private int myCount;
     
-    private void resetMap() {
+    private void resetState() {
+        myCount = 0;
         myOperations.put("READ", 0);
         myOperations.put("SCAN", 0);
         myOperations.put("UPDATE", 0);
@@ -26,7 +30,7 @@ public class CassandraHBaseClient extends DB {
     @Override
     public void init() throws DBException {
         myOperations = new HashMap<String, Integer>();
-        resetMap();
+        resetState();
         
         myCassandra = new CassandraClient8();
         myCassandra.init();
@@ -45,8 +49,14 @@ public class CassandraHBaseClient extends DB {
     
     private void recordAndEvaluateSwitch(String type) {
         myOperations.put(type, myOperations.get(type) + 1);
+        myCount++;
         
-        // Look at stats and decide whether to switch here
+        if(myCount >= INTERVAL - 1) {
+            // Look at stats and decide whether to switch here
+            
+            resetState();
+        }
+        
     }
 
     @Override
