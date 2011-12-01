@@ -1,6 +1,7 @@
 package com.yahoo.ycsb.db;
 
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.Vector;
 import com.yahoo.ycsb.DB;
@@ -12,8 +13,21 @@ public class CassandraHBaseClient extends DB {
     private DB myHBase;
     private DB myCurrent;
     
+    private Map<String, Integer> myOperations;
+    
+    private void resetMap() {
+        myOperations.put("READ", 0);
+        myOperations.put("SCAN", 0);
+        myOperations.put("UPDATE", 0);
+        myOperations.put("INSERT", 0);
+        myOperations.put("DELETE", 0);
+    }
+    
     @Override
     public void init() throws DBException {
+        myOperations = new HashMap<String, Integer>();
+        resetMap();
+        
         myCassandra = new CassandraClient8();
         myCassandra.init();
         myHBase = new HBaseClient();
@@ -28,14 +42,20 @@ public class CassandraHBaseClient extends DB {
         myCassandra.cleanup();
         myHBase.cleanup();
     }
+    
+    private void recordAndEvaluateSwitch(String type) {
+        myOperations.put(type, myOperations.get(type) + 1);
+        
+        // Look at stats and decide whether to switch here
+    }
 
     @Override
     public int read (String table,
                      String key,
                      Set<String> fields,
                      HashMap<String, String> result) {
-        // TODO Auto-generated method stub
-        return 0;
+        recordAndEvaluateSwitch("READ");
+        return myCurrent.read(table, key, fields, result);
     }
 
 
@@ -45,28 +65,28 @@ public class CassandraHBaseClient extends DB {
                      int recordcount,
                      Set<String> fields,
                      Vector<HashMap<String, String>> result) {
-        // TODO Auto-generated method stub
-        return 0;
+        recordAndEvaluateSwitch("SCAN");
+        return myCurrent.scan(table, startkey, recordcount, fields, result);
     }
 
 
     @Override
     public int update (String table, String key, HashMap<String, String> values) {
-        // TODO Auto-generated method stub
+        recordAndEvaluateSwitch("UPDATE");
         return 0;
     }
 
 
     @Override
     public int insert (String table, String key, HashMap<String, String> values) {
-        // TODO Auto-generated method stub
+        recordAndEvaluateSwitch("INSERT");
         return 0;
     }
 
 
     @Override
     public int delete (String table, String key) {
-        // TODO Auto-generated method stub
+        recordAndEvaluateSwitch("DELETE");
         return 0;
     }
 
