@@ -44,6 +44,11 @@
 		<property name="db.dir" value="db/hbase"/>
 		<antcall target="dbcompile"/>
 	</target>
+   	
+   	<target name="dbcompile-cassandra-hbase" depends="compile">
+   		<property name="db.dir" value="db/cassandra-hbase"/>
+   		<antcall target="dbcompile"/>
+   	</target>
 
    	<target name="dbcompile-mongodb" depends="compile">
 		<property name="db.dir" value="db/mongodb"/>
