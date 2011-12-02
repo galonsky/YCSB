@@ -45,7 +45,7 @@
 		<antcall target="dbcompile"/>
 	</target>
    	
-   	<target name="dbcompile-cassandra-hbase" depends="compile">
+   	<target name="dbcompile-cassandra-hbase" depends="dbcompile-cassandra-0.8,dbcompile-hbase,compile">
    		<property name="db.dir" value="db/cassandra-hbase"/>
    		<antcall target="dbcompile"/>
    	</target>
