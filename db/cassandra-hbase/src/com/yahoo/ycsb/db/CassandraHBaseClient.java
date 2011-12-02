@@ -83,21 +83,51 @@ public class CassandraHBaseClient extends DB {
     @Override
     public int update (String table, String key, HashMap<String, String> values) {
         recordAndEvaluateSwitch("UPDATE");
-        return 0;
+        try {
+            Update u = new Update(myCassandra, table, key, values);
+            Thread t = new Thread(u);
+            t.start();
+            int hresult = myHBase.update(table, key, values);
+            t.join();
+            return hresult & u.getResult();
+        }
+        catch (InterruptedException e) {
+            return 1;
+        }
     }
 
 
     @Override
     public int insert (String table, String key, HashMap<String, String> values) {
         recordAndEvaluateSwitch("INSERT");
-        return 0;
+        try {
+            Insert u = new Insert(myCassandra, table, key, values);
+            Thread t = new Thread(u);
+            t.start();
+            int hresult = myHBase.insert(table, key, values);
+            t.join();
+            return hresult & u.getResult();
+        }
+        catch (InterruptedException e) {
+            return 1;
+        }
     }
 
 
     @Override
     public int delete (String table, String key) {
         recordAndEvaluateSwitch("DELETE");
-        return 0;
+        try {
+            Delete u = new Delete(myCassandra, table, key);
+            Thread t = new Thread(u);
+            t.start();
+            int hresult = myHBase.delete(table, key);
+            t.join();
+            return hresult & u.getResult();
+        }
+        catch (InterruptedException e) {
+            return 1;
+        }
     }
 
 }
