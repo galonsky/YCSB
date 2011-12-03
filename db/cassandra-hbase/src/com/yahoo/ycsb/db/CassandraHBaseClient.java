@@ -2,6 +2,7 @@ package com.yahoo.ycsb.db;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.Vector;
 import com.yahoo.ycsb.DB;
@@ -32,9 +33,13 @@ public class CassandraHBaseClient extends DB {
         myOperations = new HashMap<String, Integer>();
         resetState();
         
+        Properties prop = getProperties();
+        
         myCassandra = new CassandraClient8();
+        myCassandra.setProperties(prop);
         myCassandra.init();
         myHBase = new HBaseClient();
+        myHBase.setProperties(prop);
         myHBase.init();
         
         //set default primary
