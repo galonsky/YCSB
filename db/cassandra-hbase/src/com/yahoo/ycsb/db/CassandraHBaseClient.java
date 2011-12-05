@@ -16,7 +16,15 @@ public class CassandraHBaseClient extends DB {
         READ, SCAN, UPDATE, INSERT, DELETE
     }
     
+    private enum Database {
+        HBASE, CASSANDRA
+    }
+    
     private static final int INTERVAL = 100;
+    private static final double HIGH_READ = 67/33;
+    private static final double LOW_READ = 17/83;
+    
+    private Database myPrimaryDatabase;
     
     private DB myCassandra;
     private DB myHBase;
@@ -25,13 +33,28 @@ public class CassandraHBaseClient extends DB {
     private int myCount;
     private Queue<Operation> myLastOperations;
     
-    private Map<Operation, Integer> getOperationCount() {
-        Map<Operation, Integer> map = new HashMap<Operation, Integer>();
+    private void switchDatabase(Database d) {
+        if(d == myPrimaryDatabase) return;
+        myPrimaryDatabase = d;
+        
+        switch(d) {
+            case CASSANDRA:
+                myCurrent = myCassandra;
+                break;
+            case HBASE:
+                myCurrent = myHBase;
+                break;
+        }
+        System.out.println("Switching primary database to " + d.toString());
+    }
+    
+    private Map<Operation, Double> getOperationCount() {
+        Map<Operation, Double> map = new HashMap<Operation, Double>();
         for(Operation o : myLastOperations) {
             if(map.containsKey(o))
                 map.put(o, map.get(o) + 1);
             else
-                map.put(o, 1);
+                map.put(o, 1.0);
         }
         return map;
     }
@@ -51,7 +74,7 @@ public class CassandraHBaseClient extends DB {
         myHBase.init();
         
         //set default primary
-        myCurrent = myHBase;
+        switchDatabase(Database.HBASE);
     }
     
     @Override
@@ -66,8 +89,14 @@ public class CassandraHBaseClient extends DB {
         
         if(myCount > INTERVAL) {
             myLastOperations.poll();
-            Map<Operation, Integer> map = getOperationCount();
+            Map<Operation, Double> map = getOperationCount();
             // Decide whether to switch
+            double readUpdateRatio = map.get(Operation.READ) / map.get(Operation.UPDATE);
+            
+            if(readUpdateRatio > HIGH_READ)
+                switchDatabase(Database.CASSANDRA);
+            else if(readUpdateRatio < LOW_READ)
+                switchDatabase(Database.HBASE);
         }
         
     }
