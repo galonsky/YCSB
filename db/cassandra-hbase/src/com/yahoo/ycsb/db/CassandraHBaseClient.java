@@ -91,7 +91,13 @@ public class CassandraHBaseClient extends DB {
             myLastOperations.poll();
             Map<Operation, Double> map = getOperationCount();
             // Decide whether to switch
-            double readUpdateRatio = map.get(Operation.READ) / map.get(Operation.UPDATE);
+            double read = map.get(Operation.READ);
+            double update = map.get(Operation.UPDATE);
+            
+            if(read == 0.0 && update == 0.0)
+                return;
+            
+            double readUpdateRatio = read / update;
             
             if(readUpdateRatio > HIGH_READ)
                 switchDatabase(Database.CASSANDRA);
