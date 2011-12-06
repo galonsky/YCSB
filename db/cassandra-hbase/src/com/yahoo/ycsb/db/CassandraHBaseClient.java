@@ -50,11 +50,11 @@ public class CassandraHBaseClient extends DB {
     
     private Map<Operation, Double> getOperationCount() {
         Map<Operation, Double> map = new HashMap<Operation, Double>();
+        for(Operation op : Operation.values()) {
+            map.put(op, 0.0);
+        }
         for(Operation o : myLastOperations) {
-            if(map.containsKey(o))
-                map.put(o, map.get(o) + 1);
-            else
-                map.put(o, 1.0);
+            map.put(o, map.get(o) + 1);
         }
         return map;
     }
