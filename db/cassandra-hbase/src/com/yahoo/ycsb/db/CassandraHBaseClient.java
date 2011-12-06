@@ -25,26 +25,47 @@ public class CassandraHBaseClient extends DB {
     private static final double LOW_READ = 17/83;
     
     private Database myPrimaryDatabase;
+    private Database mySecondaryDatabase;
     
     private DB myCassandra;
     private DB myHBase;
     private DB myCurrent;
+    private DB myOther;
 
     private int myCount;
     private Queue<Operation> myLastOperations;
+    private Queue<Runnable> myPendingWrites;
+    
+    private void applyWrites(Database d) {
+        if(!myPendingWrites.isEmpty())
+            System.out.println("Applying pending writes to " + d.toString());
+        
+        while(!myPendingWrites.isEmpty()) {
+            Runnable r = myPendingWrites.poll();
+            r.run();
+        }
+    }
     
     private void switchDatabase(Database d) {
         if(d == myPrimaryDatabase) return;
-        myPrimaryDatabase = d;
+        
+        applyWrites(d);
         
         switch(d) {
             case CASSANDRA:
                 myCurrent = myCassandra;
+                myOther = myHBase;
+                myPrimaryDatabase = Database.CASSANDRA;
+                mySecondaryDatabase = Database.HBASE;
                 break;
             case HBASE:
                 myCurrent = myHBase;
+                myOther = myCassandra;
+                myPrimaryDatabase = Database.HBASE;
+                mySecondaryDatabase = Database.CASSANDRA;
                 break;
         }
+        
         System.out.println("Switching primary database to " + d.toString());
     }
     
@@ -62,6 +83,7 @@ public class CassandraHBaseClient extends DB {
     @Override
     public void init() throws DBException {
         myLastOperations = new LinkedList<Operation>();
+        myPendingWrites = new LinkedList<Runnable>();
         myCount = 0;
         
         Properties prop = getProperties();
@@ -79,6 +101,9 @@ public class CassandraHBaseClient extends DB {
     
     @Override
     public void cleanup() throws DBException {
+        
+        applyWrites(mySecondaryDatabase);
+        
         myCassandra.cleanup();
         myHBase.cleanup();
     }
@@ -131,51 +156,27 @@ public class CassandraHBaseClient extends DB {
     @Override
     public int update (String table, String key, HashMap<String, String> values) {
         recordAndEvaluateSwitch(Operation.UPDATE);
-        try {
-            Update u = new Update(myCassandra, table, key, values);
-            Thread t = new Thread(u);
-            t.start();
-            int hresult = myHBase.update(table, key, values);
-            t.join();
-            return hresult & u.getResult();
-        }
-        catch (InterruptedException e) {
-            return 1;
-        }
+        
+        myPendingWrites.add(new Update(myOther, table, key, values));
+        return myCurrent.update(table, key, values);
     }
 
 
     @Override
     public int insert (String table, String key, HashMap<String, String> values) {
         recordAndEvaluateSwitch(Operation.INSERT);
-        try {
-            Insert u = new Insert(myCassandra, table, key, values);
-            Thread t = new Thread(u);
-            t.start();
-            int hresult = myHBase.insert(table, key, values);
-            t.join();
-            return hresult & u.getResult();
-        }
-        catch (InterruptedException e) {
-            return 1;
-        }
+        
+        myPendingWrites.add(new Insert(myOther, table, key, values));
+        return myCurrent.insert(table, key, values);
     }
 
 
     @Override
     public int delete (String table, String key) {
         recordAndEvaluateSwitch(Operation.DELETE);
-        try {
-            Delete u = new Delete(myCassandra, table, key);
-            Thread t = new Thread(u);
-            t.start();
-            int hresult = myHBase.delete(table, key);
-            t.join();
-            return hresult & u.getResult();
-        }
-        catch (InterruptedException e) {
-            return 1;
-        }
+        
+        myPendingWrites.add(new Delete(myOther, table, key));
+        return myCurrent.delete(table, key);
     }
 
 }
