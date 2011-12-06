@@ -23,6 +23,7 @@ public class CassandraHBaseClient extends DB {
     private static final int INTERVAL = 100;
     private static final double HIGH_READ = 67/33;
     private static final double LOW_READ = 17/83;
+    private static final String DEBUG_KEY = "CH.debug";
     
     private Database myPrimaryDatabase;
     private Database mySecondaryDatabase;
@@ -31,25 +32,18 @@ public class CassandraHBaseClient extends DB {
     private DB myHBase;
     private DB myCurrent;
     private DB myOther;
+    
+    private boolean debug;
 
     private int myCount;
     private Queue<Operation> myLastOperations;
-    private Queue<Runnable> myPendingWrites;
     
-    private void applyWrites(Database d) {
-        if(!myPendingWrites.isEmpty())
-            System.out.println("Applying pending writes to " + d.toString());
-        
-        while(!myPendingWrites.isEmpty()) {
-            Runnable r = myPendingWrites.poll();
-            r.run();
-        }
-    }
+    private SecondaryUpdater myUpdater;
     
     private void switchDatabase(Database d) {
         if(d == myPrimaryDatabase) return;
         
-        applyWrites(d);
+        while(myUpdater.isBusy()); // wait for secondary writes to finish
         
         switch(d) {
             case CASSANDRA:
@@ -69,6 +63,11 @@ public class CassandraHBaseClient extends DB {
         System.out.println("Switching primary database to " + d.toString());
     }
     
+    private void debugLog(String message) {
+        if(debug)
+            System.out.println(message);
+    }
+    
     private Map<Operation, Double> getOperationCount() {
         Map<Operation, Double> map = new HashMap<Operation, Double>();
         for(Operation op : Operation.values()) {
@@ -83,10 +82,11 @@ public class CassandraHBaseClient extends DB {
     @Override
     public void init() throws DBException {
         myLastOperations = new LinkedList<Operation>();
-        myPendingWrites = new LinkedList<Runnable>();
         myCount = 0;
         
         Properties prop = getProperties();
+        
+        debug = (prop.containsKey(DEBUG_KEY) && prop.get(DEBUG_KEY).equals("true"));
         
         myCassandra = new CassandraClient8();
         myCassandra.setProperties(prop);
@@ -95,6 +95,10 @@ public class CassandraHBaseClient extends DB {
         myHBase.setProperties(prop);
         myHBase.init();
         
+        myUpdater = new SecondaryUpdater(debug);
+        Thread t = new Thread(myUpdater);
+        t.start();
+        
         //set default primary
         switchDatabase(Database.HBASE);
     }
@@ -102,7 +106,8 @@ public class CassandraHBaseClient extends DB {
     @Override
     public void cleanup() throws DBException {
         
-        applyWrites(mySecondaryDatabase);
+        while(myUpdater.isBusy()); // wait for secondary writes to finish
+        myUpdater.destroy();
         
         myCassandra.cleanup();
         myHBase.cleanup();
@@ -138,6 +143,7 @@ public class CassandraHBaseClient extends DB {
                      Set<String> fields,
                      HashMap<String, String> result) {
         recordAndEvaluateSwitch(Operation.READ);
+        debugLog("Primary READ");
         return myCurrent.read(table, key, fields, result);
     }
 
@@ -149,6 +155,7 @@ public class CassandraHBaseClient extends DB {
                      Set<String> fields,
                      Vector<HashMap<String, String>> result) {
         recordAndEvaluateSwitch(Operation.SCAN);
+        debugLog("Primary SCAN");
         return myCurrent.scan(table, startkey, recordcount, fields, result);
     }
 
@@ -157,7 +164,8 @@ public class CassandraHBaseClient extends DB {
     public int update (String table, String key, HashMap<String, String> values) {
         recordAndEvaluateSwitch(Operation.UPDATE);
         
-        myPendingWrites.add(new Update(myOther, table, key, values));
+        myUpdater.addOperation(new Update(myOther, table, key, values));
+        debugLog("Primary UPDATE");
         return myCurrent.update(table, key, values);
     }
 
@@ -166,7 +174,8 @@ public class CassandraHBaseClient extends DB {
     public int insert (String table, String key, HashMap<String, String> values) {
         recordAndEvaluateSwitch(Operation.INSERT);
         
-        myPendingWrites.add(new Insert(myOther, table, key, values));
+        myUpdater.addOperation(new Insert(myOther, table, key, values));
+        debugLog("Primary INSERT");
         return myCurrent.insert(table, key, values);
     }
 
@@ -175,7 +184,8 @@ public class CassandraHBaseClient extends DB {
     public int delete (String table, String key) {
         recordAndEvaluateSwitch(Operation.DELETE);
         
-        myPendingWrites.add(new Delete(myOther, table, key));
+        myUpdater.addOperation(new Delete(myOther, table, key));
+        debugLog("Primary DELETE");
         return myCurrent.delete(table, key);
     }
 
