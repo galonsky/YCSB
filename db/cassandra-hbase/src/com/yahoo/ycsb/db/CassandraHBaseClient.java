@@ -20,10 +20,16 @@ public class CassandraHBaseClient extends DB {
         HBASE, CASSANDRA
     }
     
-    private static final int INTERVAL = 100;
-    private static final double HIGH_READ = 67/33;
-    private static final double LOW_READ = 17/83;
+    private static final int DEFAULT_INTERVAL = 15;
+    private static final double HIGH_READ_DEFAULT = 2.0;
+    private static final double LOW_READ_DEFAULT = 0.5;
     private static final String DEBUG_KEY = "CH.debug";
+    private static final String INTERVAL_KEY = "CH.interval";
+    private static final String LOW_READ_KEY = "CH.lowread";
+    private static final String HIGH_READ_KEY = "CH.highread";
+    
+    private double myHighRead;
+    private double myLowRead;
     
     private Database myPrimaryDatabase;
     private Database mySecondaryDatabase;
@@ -36,6 +42,7 @@ public class CassandraHBaseClient extends DB {
     private boolean debug;
 
     private int myCount;
+    private int myInterval;
     private Queue<Operation> myLastOperations;
     
     private SecondaryUpdater myUpdater;
@@ -86,7 +93,38 @@ public class CassandraHBaseClient extends DB {
         
         Properties prop = getProperties();
         
-        debug = (prop.containsKey(DEBUG_KEY) && prop.get(DEBUG_KEY).equals("true"));
+        debug = (prop.containsKey(DEBUG_KEY) && prop.getProperty(DEBUG_KEY).equals("true"));
+        
+        myInterval = DEFAULT_INTERVAL;
+        myLowRead = LOW_READ_DEFAULT;
+        myHighRead = HIGH_READ_DEFAULT;
+        
+        if(prop.containsKey(INTERVAL_KEY)) {
+            try {
+                myInterval = Integer.parseInt(prop.getProperty(INTERVAL_KEY));
+            }
+            catch(NumberFormatException e) {
+                myInterval = DEFAULT_INTERVAL;
+            }
+        }
+        
+        if(prop.containsKey(LOW_READ_KEY)) {
+            try {
+                myLowRead = Double.parseDouble(prop.getProperty(LOW_READ_KEY));
+            }
+            catch(NumberFormatException e) {
+                myLowRead = LOW_READ_DEFAULT;
+            }
+        }
+        
+        if(prop.containsKey(HIGH_READ_KEY)) {
+            try {
+                myHighRead = Double.parseDouble(prop.getProperty(HIGH_READ_KEY));
+            }
+            catch(NumberFormatException e) {
+                myHighRead = HIGH_READ_DEFAULT;
+            }
+        }
         
         myCassandra = new CassandraClient8();
         myCassandra.setProperties(prop);
@@ -117,7 +155,7 @@ public class CassandraHBaseClient extends DB {
         myLastOperations.add(type);
         myCount++;
         
-        if(myCount > INTERVAL) {
+        if(myCount > myInterval) {
             myLastOperations.poll();
             Map<Operation, Double> map = getOperationCount();
             // Decide whether to switch
@@ -128,10 +166,11 @@ public class CassandraHBaseClient extends DB {
                 return;
             
             double readUpdateRatio = read / update;
+            debugLog("Read/Update ratio: " + readUpdateRatio);
             
-            if(readUpdateRatio > HIGH_READ)
+            if(readUpdateRatio > myHighRead)
                 switchDatabase(Database.CASSANDRA);
-            else if(readUpdateRatio < LOW_READ)
+            else if(readUpdateRatio < myLowRead)
                 switchDatabase(Database.HBASE);
         }
         
