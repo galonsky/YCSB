@@ -46,11 +46,13 @@ public class CassandraHBaseClient extends DB {
     private Queue<Operation> myLastOperations;
     
     private SecondaryUpdater myUpdater;
+    private Thread mySecondaryThread;
+    private boolean myUpdaterRunning;
     
     private void switchDatabase(Database d) {
         if(d == myPrimaryDatabase) return;
         
-        while(myUpdater.isBusy()); // wait for secondary writes to finish
+        while(myUpdaterRunning && myUpdater.isBusy()); // wait for secondary writes to finish
         
         switch(d) {
             case CASSANDRA:
@@ -84,6 +86,25 @@ public class CassandraHBaseClient extends DB {
             map.put(o, map.get(o) + 1);
         }
         return map;
+    }
+    
+    private void startUpdater() {
+        myUpdater = new SecondaryUpdater(debug);
+        mySecondaryThread = new Thread(myUpdater);
+        mySecondaryThread.start();
+        myUpdaterRunning = true;
+    }
+    
+    private void stopUpdater() {
+        try {
+            myUpdater.destroy();
+            mySecondaryThread.join();
+            myUpdaterRunning = false;
+        }
+        catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        
     }
     
     @Override
@@ -133,9 +154,7 @@ public class CassandraHBaseClient extends DB {
         myHBase.setProperties(prop);
         myHBase.init();
         
-        myUpdater = new SecondaryUpdater(debug);
-        Thread t = new Thread(myUpdater);
-        t.start();
+        myUpdaterRunning = false;
         
         //set default primary
         switchDatabase(Database.HBASE);
@@ -143,15 +162,28 @@ public class CassandraHBaseClient extends DB {
     
     @Override
     public void cleanup() throws DBException {
-        
-        while(myUpdater.isBusy()); // wait for secondary writes to finish
-        myUpdater.destroy();
+        if(myUpdaterRunning) {
+            while(myUpdater.isBusy()); // wait for secondary writes to finish
+            myUpdater.destroy();
+        }
         
         myCassandra.cleanup();
         myHBase.cleanup();
     }
     
     private void recordAndEvaluateSwitch(Operation type) {
+        
+        if(type == Operation.READ || type == Operation.SCAN) { //read only operation
+            
+            // stop updater if it isn't busy
+            if(myUpdaterRunning && !myUpdater.isBusy())
+                stopUpdater();
+        }
+        else { //write
+            if(!myUpdaterRunning) //start updater if not running
+                startUpdater();
+        }
+        
         myLastOperations.add(type);
         myCount++;
         
