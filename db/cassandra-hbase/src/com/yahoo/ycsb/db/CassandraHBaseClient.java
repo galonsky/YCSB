@@ -52,7 +52,10 @@ public class CassandraHBaseClient extends DB {
     private void switchDatabase(Database d) {
         if(d == myPrimaryDatabase) return;
         
-        while(myUpdaterRunning && myUpdater.isBusy()); // wait for secondary writes to finish
+        if(myUpdaterRunning) {
+            while(myUpdater.isBusy()); // wait for secondary writes to finish
+            stopUpdater();
+        }
         
         switch(d) {
             case CASSANDRA:
@@ -89,17 +92,21 @@ public class CassandraHBaseClient extends DB {
     }
     
     private void startUpdater() {
+        debugLog("Starting updater...");
         myUpdater = new SecondaryUpdater(debug);
         mySecondaryThread = new Thread(myUpdater);
         mySecondaryThread.start();
         myUpdaterRunning = true;
+        debugLog("Updater Started");
     }
     
     private void stopUpdater() {
         try {
+            debugLog("Stopping updater...");
             myUpdater.destroy();
             mySecondaryThread.join();
             myUpdaterRunning = false;
+            debugLog("Updater Stopped");
         }
         catch (InterruptedException e) {
             e.printStackTrace();
@@ -164,7 +171,7 @@ public class CassandraHBaseClient extends DB {
     public void cleanup() throws DBException {
         if(myUpdaterRunning) {
             while(myUpdater.isBusy()); // wait for secondary writes to finish
-            myUpdater.destroy();
+            stopUpdater();
         }
         
         myCassandra.cleanup();
